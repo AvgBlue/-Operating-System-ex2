@@ -125,6 +125,7 @@ int compareFiles(FileReader *fr1, FileReader *fr2)
     return 3;
 }
 
+
 int main(int argc, char *argv[])
 {
     // Check that an argument was provided
