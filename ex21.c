@@ -19,6 +19,8 @@ typedef struct FileReader
     char buf[BUFSIZ];
     // number of byte read in the buffer
     ssize_t nread;
+    // total size of the file
+    off_t size;
 } FileReader;
 
 FileReader openFile(const char *path)
@@ -26,9 +28,23 @@ FileReader openFile(const char *path)
     FileReader fr;
     // Open the file for reading
     fr.fd = open(path, O_RDONLY);
+    if (fr.fd == -1)
+    {
+        perror("open");
+        exit(EXIT_FAILURE);
+    }
+    // Get the size of the file
+    struct stat st;
+    if (fstat(fr.fd, &st) == -1)
+    {
+        perror("fstat");
+        exit(EXIT_FAILURE);
+    }
+    fr.size = st.st_size;
     fr.nread = 0;
     return fr;
 }
+
 void closeFile(FileReader *fr)
 {
     close(fr->fd);
@@ -67,6 +83,8 @@ int compareFiles(FileReader *fr1, FileReader *fr2)
     bool similar = true;
     readPart(fr1);
     readPart(fr2);
+    off_t total1 = 0;
+    off_t total2 = 0;
     int i = 0;
     int j = 0;
     while (fr1->nread > 0 && fr2->nread > 0)
@@ -74,11 +92,15 @@ int compareFiles(FileReader *fr1, FileReader *fr2)
         if (i >= fr1->nread)
         {
             readPart(fr1);
+            if (!fr1->nread > 0)
+                break;
             i = 0;
         }
         if (j >= fr2->nread)
         {
             readPart(fr2);
+            if (!fr2->nread > 0)
+                break;
             j = 0;
         }
         // still identical
@@ -86,6 +108,8 @@ int compareFiles(FileReader *fr1, FileReader *fr2)
         {
             i++;
             j++;
+            total1++;
+            total2++;
             continue;
         }
         // don't identical
@@ -94,11 +118,13 @@ int compareFiles(FileReader *fr1, FileReader *fr2)
         if (fr1->buf[i] == ' ' || fr1->buf[i] == '\n' || fr1->buf[i] == '\t' || fr1->buf[i] == '\r')
         {
             i++;
+            total1++;
             continue;
         }
         if (fr2->buf[j] == ' ' || fr2->buf[j] == '\n' || fr2->buf[j] == '\t' || fr2->buf[j] == '\r')
         {
             j++;
+            total2++;
             continue;
         }
         if (!isSameChar(fr1->buf[i], fr2->buf[j]))
@@ -108,11 +134,44 @@ int compareFiles(FileReader *fr1, FileReader *fr2)
         }
         i++;
         j++;
+        total1++;
+        total2++;
     }
-    if (fr1->nread != fr2->nread)
+    while (fr1->nread > 0)
     {
+        if (i >= fr1->nread)
+        {
+            readPart(fr1);
+            if (!fr1->nread > 0)
+                break;
+            i = 0;
+        }
         identical = false;
+        if (fr1->buf[i] == ' ' || fr1->buf[i] == '\n' || fr1->buf[i] == '\t' || fr1->buf[i] == '\r')
+        {
+            i++;
+            continue;
+        }
         similar = false;
+        i++;
+    }
+    while (fr2->nread > 0)
+    {
+        if (j >= fr2->nread)
+        {
+            readPart(fr2);
+            if (!fr2->nread > 0)
+                break;
+            j = 0;
+        }
+        identical = false;
+        if (fr2->buf[j] == ' ' || fr2->buf[j] == '\n' || fr2->buf[j] == '\t' || fr2->buf[j] == '\r')
+        {
+            j++;
+            continue;
+        }
+        similar = false;
+        j++;
     }
     if (identical)
     {
@@ -124,7 +183,6 @@ int compareFiles(FileReader *fr1, FileReader *fr2)
     }
     return 3;
 }
-
 
 int main(int argc, char *argv[])
 {

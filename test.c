@@ -21,6 +21,56 @@
 #define EXECUTION_TIMED_OUT 1
 #define EXECUTION_ERROR -1
 
+void printFile(const char *path)
+{
+    FILE *file = fopen(path, "r");
+    if (file == NULL)
+    {
+        fprintf(stderr, "Failed to open file '%s'\n", path);
+        return;
+    }
+    int c;
+    while ((c = fgetc(file)) != EOF)
+    {
+        putchar(c);
+    }
+    fclose(file);
+}
+
+void addResultToFile(int result_fd, int grade, const char *name)
+{
+    const char *category;
+    switch (grade)
+    {
+    case 0:
+        category = "NO_C_FILE";
+        break;
+    case 10:
+        category = "Compilation_Error";
+        break;
+    case 20:
+        category = "TIMEOUT";
+        break;
+    case 50:
+        category = "Wrong_output";
+        break;
+    case 75:
+        category = "Similar_output";
+        break;
+    case 100:
+        category = "EXCELLENT";
+        break;
+    default:
+        return; // Invalid number, do nothing
+    }
+    char result[MAX_STRING_SIZE];
+    int length = snprintf(result, MAX_STRING_SIZE, "%s,%d,%s\n", name, grade, category);
+    if (write(result_fd, result, length) == -1)
+    {
+        perror("Error writing to file");
+    }
+}
+
 int executeCommand(char *args[], int input_fd, int output_fd, int error_fd, double *runtime)
 {
     pid_t pid = fork();
@@ -65,7 +115,8 @@ int textCompare(char path1[MAX_STRING_SIZE], char path2[MAX_STRING_SIZE])
     char *args1[] = {"gcc", "ex21.c", "-o", "ex21", NULL};
     ;
     int status = executeCommand(args1, STDIN_FILENO, STDOUT_FILENO, error_fd, &time);
-    if(status == 1){
+    if (status == 1)
+    {
         return -1;
     }
     char *args2[] = {"./ex21", path1, path2, NULL};
@@ -76,6 +127,7 @@ int textCompare(char path1[MAX_STRING_SIZE], char path2[MAX_STRING_SIZE])
         // TODO to change the error
         perror("unlink failed");
     }
+    unlink("ex21");
     return status;
 }
 
@@ -110,14 +162,13 @@ int runFile(int input_fd, int output_fd)
     }
     char *args[] = {"./a.out", NULL};
     double time;
-    int status = executeCommand(args, input_fd, output_fd, error_fd, &time);
+    /*int status = */ executeCommand(args, input_fd, output_fd, error_fd, &time);
     close(error_fd);
     if (unlink("compeionError") == -1)
     {
         // TODO to change the error
         perror("unlink failed");
     }
-    int timeStatus = 0;
     if (time > 5)
     {
         return EXECUTION_TIMED_OUT;
@@ -175,17 +226,24 @@ void findCFile(const char *dir_path, char *c_file_path)
     closedir(dir);
 }
 
-int grade(char path[MAX_STRING_SIZE], int input_fd, char cOutputPath[MAX_STRING_SIZE])
+int grade(char path[MAX_STRING_SIZE], char inputFilePath[MAX_STRING_SIZE], char cOutputPath[MAX_STRING_SIZE])
 {
     int returnValue = 0;
     // TODO to set the file name to defined
-    int output_fd = open("output", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    char outputPath[MAX_STRING_SIZE] = "output.txt";
+    int output_fd = open(outputPath, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
     if (output_fd == -1)
     {
         perror("open");
         return -1;
     }
-
+    int input_fd = open(inputFilePath, O_RDONLY);
+    if (input_fd == -1)
+    {
+        // TODO to change the error
+        perror("open input file");
+        return EXIT_FAILURE;
+    }
     do
     {
         char cfile[MAX_STRING_SIZE] = {0};
@@ -198,7 +256,7 @@ int grade(char path[MAX_STRING_SIZE], int input_fd, char cOutputPath[MAX_STRING_
             break;
         }
         int compileStatus = compileFile(cfile);
-        if (compileFile == 1)
+        if (compileStatus == 1)
         {
             // grade is 10 COMPILATION_ERROR
             // TODO set a define
@@ -207,6 +265,7 @@ int grade(char path[MAX_STRING_SIZE], int input_fd, char cOutputPath[MAX_STRING_
         }
         // try to run the c file
         int runStatus = runFile(input_fd, output_fd);
+        close(output_fd);
         unlink("a.out");
         if (runStatus == EXECUTION_TIMED_OUT)
         {
@@ -218,7 +277,7 @@ int grade(char path[MAX_STRING_SIZE], int input_fd, char cOutputPath[MAX_STRING_
         if (runStatus == EXECUTION_SUCCESSFUL)
         {
             // compare the output
-            int compareStatus = textCompare("output", cOutputPath);
+            int compareStatus = textCompare(outputPath, cOutputPath);
             if (compareStatus == 1)
             {
                 // grade is 100 EXCELLENT
@@ -237,12 +296,12 @@ int grade(char path[MAX_STRING_SIZE], int input_fd, char cOutputPath[MAX_STRING_
             // TODO to add error message
         }
     } while (0);
-    close(output_fd);
-    unlink("output");
+    unlink(outputPath);
+    close(input_fd);
     return returnValue;
 }
 
-void runOverAllFolders(char studentsFolder[MAX_STRING_SIZE], int input_fd, char cOutputPath[MAX_STRING_SIZE])
+void runOverAllFolders(char studentsFolder[MAX_STRING_SIZE], char inputFilePath[MAX_STRING_SIZE], char cOutputPath[MAX_STRING_SIZE], int result_fd)
 {
     DIR *dir;
     struct dirent *entry;
@@ -281,8 +340,9 @@ void runOverAllFolders(char studentsFolder[MAX_STRING_SIZE], int input_fd, char 
         // Check if the entry is a directory
         if (S_ISDIR(file_info.st_mode))
         {
-            int score = grade(path, input_fd, cOutputPath);
-            printf("%s ->  %d\n", entry->d_name, score);
+            int score = grade(path, inputFilePath, cOutputPath);
+            printf("%s -> %d\n", entry->d_name, score);
+            addResultToFile(result_fd, score, entry->d_name);
         }
     }
 
@@ -290,9 +350,9 @@ void runOverAllFolders(char studentsFolder[MAX_STRING_SIZE], int input_fd, char 
     closedir(dir);
 }
 
-int main(int argc, char *argv[])
+int main(/*int argc, char *argv[]*/)
 {
-    int compareStatus = textCompare("files/textComparison/similar/moo/joey1.txt", "files/textComparison/similar/moo/joey2.txt");
-    printf("compile status is %d\n", compareStatus);
+    int status= textCompare("textComparison/similar/moo/joey1.txt","textComparison/similar/moo/joey2.txt");
+    printf("%d\n",status);
     return 0;
 }

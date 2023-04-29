@@ -21,6 +21,22 @@
 #define EXECUTION_TIMED_OUT 1
 #define EXECUTION_ERROR -1
 
+void printFile(const char *path)
+{
+    FILE *file = fopen(path, "r");
+    if (file == NULL)
+    {
+        fprintf(stderr, "Failed to open file '%s'\n", path);
+        return;
+    }
+    int c;
+    while ((c = fgetc(file)) != EOF)
+    {
+        putchar(c);
+    }
+    fclose(file);
+}
+
 void addResultToFile(int result_fd, int grade, const char *name)
 {
     const char *category;
@@ -210,7 +226,7 @@ void findCFile(const char *dir_path, char *c_file_path)
     closedir(dir);
 }
 
-int grade(char path[MAX_STRING_SIZE], int input_fd, char cOutputPath[MAX_STRING_SIZE])
+int grade(char path[MAX_STRING_SIZE], char inputFilePath[MAX_STRING_SIZE], char cOutputPath[MAX_STRING_SIZE])
 {
     int returnValue = 0;
     // TODO to set the file name to defined
@@ -221,7 +237,13 @@ int grade(char path[MAX_STRING_SIZE], int input_fd, char cOutputPath[MAX_STRING_
         perror("open");
         return -1;
     }
-
+    int input_fd = open(inputFilePath, O_RDONLY);
+    if (input_fd == -1)
+    {
+        // TODO to change the error
+        perror("open input file");
+        return EXIT_FAILURE;
+    }
     do
     {
         char cfile[MAX_STRING_SIZE] = {0};
@@ -275,10 +297,11 @@ int grade(char path[MAX_STRING_SIZE], int input_fd, char cOutputPath[MAX_STRING_
         }
     } while (0);
     unlink(outputPath);
+    close(input_fd);
     return returnValue;
 }
 
-void runOverAllFolders(char studentsFolder[MAX_STRING_SIZE], int input_fd, char cOutputPath[MAX_STRING_SIZE], int result_fd)
+void runOverAllFolders(char studentsFolder[MAX_STRING_SIZE], char inputFilePath[MAX_STRING_SIZE], char cOutputPath[MAX_STRING_SIZE], int result_fd)
 {
     DIR *dir;
     struct dirent *entry;
@@ -317,7 +340,7 @@ void runOverAllFolders(char studentsFolder[MAX_STRING_SIZE], int input_fd, char 
         // Check if the entry is a directory
         if (S_ISDIR(file_info.st_mode))
         {
-            int score = grade(path, input_fd, cOutputPath);
+            int score = grade(path, inputFilePath, cOutputPath);
             printf("%s -> %d\n", entry->d_name, score);
             addResultToFile(result_fd, score, entry->d_name);
         }
@@ -364,18 +387,11 @@ int main(/*int argc, char *argv[]*/)
     strcpy(studentsFolder, token);
     // second line
     token = strtok(NULL, "\n");
-    strcpy(correct_outputFile, token);
+    strcpy(inputFile, token);
     // third line
     token = strtok(NULL, "\n");
-    strcpy(inputFile, token);
+    strcpy(correct_outputFile, token);
 
-    int input_fd = open(inputFile, O_RDONLY);
-    if (input_fd == -1)
-    {
-        // TODO to change the error
-        perror("open input file");
-        return EXIT_FAILURE;
-    }
     int result_fd = open("results.csv", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
     if (result_fd == -1)
     {
@@ -384,9 +400,9 @@ int main(/*int argc, char *argv[]*/)
     }
 
     // run over all of the folders in the students folder
-    runOverAllFolders(studentsFolder, input_fd, correct_outputFile, result_fd);
+    runOverAllFolders(studentsFolder, inputFile, correct_outputFile, result_fd);
 
     close(result_fd);
-    close(input_fd);
+
     return 0;
 }
