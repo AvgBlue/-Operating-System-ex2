@@ -1,18 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <stdbool.h>
 #include <string.h>
-#include <stdarg.h>
 #include <dirent.h>
 #include <sys/time.h>
 #include <sys/wait.h>
 
-#define EXIT_EXECVP_FAILED 99
-#define MAX_SIZE 150
 #define MAX_STRING_SIZE 150
 #define CALCULATE_ELAPSED_TIME(start_time, end_time) \
     ((end_time.tv_sec - start_time.tv_sec) + (end_time.tv_usec - start_time.tv_usec) / 1000000.0)
@@ -21,53 +16,44 @@
 #define EXECUTION_TIMED_OUT 1
 #define EXECUTION_ERROR -1
 
-void printFile(const char *path)
-{
-    FILE *file = fopen(path, "r");
-    if (file == NULL)
-    {
-        fprintf(stderr, "Failed to open file '%s'\n", path);
-        return;
-    }
-    int c;
-    while ((c = fgetc(file)) != EOF)
-    {
-        putchar(c);
-    }
-    fclose(file);
-}
-
 void addResultToFile(int result_fd, int grade, const char *name)
 {
     const char *category;
     switch (grade)
     {
     case 0:
-        category = "NO_C_FILE";
+        category = ",0,NO_C_FILE\n";
         break;
     case 10:
-        category = "Compilation_Error";
+        category = ",10,Compilation_Error\n";
         break;
     case 20:
-        category = "TIMEOUT";
+        category = ",20,TIMEOUT\n";
         break;
     case 50:
-        category = "Wrong_output";
+        category = ",50,Wrong_output\n";
         break;
     case 75:
-        category = "Similar_output";
+        category = ",75,Similar_output\n";
         break;
     case 100:
-        category = "EXCELLENT";
+        category = ",100,EXCELLENT\n";
         break;
     default:
         return; // Invalid number, do nothing
     }
     char result[MAX_STRING_SIZE];
-    int length = snprintf(result, MAX_STRING_SIZE, "%s,%d,%s\n", name, grade, category);
+    result[0] = '\0'; // Initialize result as an empty string
+
+    // Concatenate name, grade, and category into result
+    strcat(result, name);
+    strcat(result, category);
+
+    int length = strlen(result); // Get the length of the resulting string
+
     if (write(result_fd, result, length) == -1)
     {
-        perror("Error writing to file");
+        perror("Error in: write");
     }
 }
 
@@ -76,7 +62,7 @@ int executeCommand(char *args[], int input_fd, int output_fd, int error_fd, doub
     pid_t pid = fork();
     if (pid == -1)
     {
-        perror("fork");
+        perror("Error in: fork");
         exit(EXIT_FAILURE);
     }
     else if (pid == 0)
@@ -89,7 +75,7 @@ int executeCommand(char *args[], int input_fd, int output_fd, int error_fd, doub
         // Execute the command
         execvp(args[0], args);
         // If execvp returns, it means an error occurred
-        perror("execvp");
+        perror("Error in: execvp");
         exit(EXIT_FAILURE);
     }
     // Parent process
@@ -108,26 +94,18 @@ int textCompare(char path1[MAX_STRING_SIZE], char path2[MAX_STRING_SIZE])
     int error_fd = open("compeionError", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
     if (error_fd == -1)
     {
-        perror("open");
+        perror("Error in: Open");
         return -1;
     }
     double time;
-    char *args1[] = {"gcc", "ex21.c", "-o", "ex21", NULL};
-    ;
-    int status = executeCommand(args1, STDIN_FILENO, STDOUT_FILENO, error_fd, &time);
-    if (status == 1)
-    {
-        return -1;
-    }
-    char *args2[] = {"./ex21", path1, path2, NULL};
-    status = executeCommand(args2, STDIN_FILENO, STDOUT_FILENO, error_fd, &time);
+    char *args[] = {"./comp.out", path1, path2, NULL};
+    int status = executeCommand(args, STDIN_FILENO, STDOUT_FILENO, error_fd, &time);
     close(error_fd);
     if (unlink("compeionError") == -1)
     {
         // TODO to change the error
-        perror("unlink failed");
+        perror("Error in: Unlink");
     }
-    unlink("ex21");
     return status;
 }
 
@@ -136,7 +114,7 @@ int compileFile(char path[MAX_STRING_SIZE])
     int error_fd = open("compeionError", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
     if (error_fd == -1)
     {
-        perror("open");
+        perror("Error in: open");
         return -1;
     }
     char *args[] = {"gcc", path, NULL};
@@ -146,7 +124,7 @@ int compileFile(char path[MAX_STRING_SIZE])
     if (unlink("compeionError") == -1)
     {
         // TODO to change the error
-        perror("unlink failed");
+        perror("Error in: unlink");
     }
     // 0 is good 1 is bad
     return status;
@@ -157,7 +135,7 @@ int runFile(int input_fd, int output_fd)
     int error_fd = open("compeionError", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
     if (error_fd == -1)
     {
-        perror("open");
+        perror("Error in: open");
         return -1;
     }
     char *args[] = {"./a.out", NULL};
@@ -167,7 +145,7 @@ int runFile(int input_fd, int output_fd)
     if (unlink("compeionError") == -1)
     {
         // TODO to change the error
-        perror("unlink failed");
+        perror("Error in: unlink");
     }
     if (time > 5)
     {
@@ -176,6 +154,7 @@ int runFile(int input_fd, int output_fd)
     return EXECUTION_SUCCESSFUL;
 }
 
+// TODO to error check in readdir
 void findCFile(const char *dir_path, char *c_file_path)
 {
     DIR *dir;
@@ -187,7 +166,8 @@ void findCFile(const char *dir_path, char *c_file_path)
     dir = opendir(dir_path);
     if (dir == NULL)
     {
-        printf("Error opening directory\n");
+        perror("Error in: opendir");
+        // TODO to change the error
         exit(EXIT_FAILURE);
     }
 
@@ -209,21 +189,17 @@ void findCFile(const char *dir_path, char *c_file_path)
         // Check if the extension is ".c"
         if (strcmp(extension, ".c") == 0)
         {
-            // If the file name ends with ".c", construct the path and copy it to the buffer
-            if (strlen(dir_path) + len + 2 > MAX_STRING_SIZE)
-            {
-                printf("Path too long\n");
-                exit(EXIT_FAILURE);
-            }
             strcpy(c_file_path, dir_path);
             strcat(c_file_path, "/");
             strcat(c_file_path, entry->d_name);
             break;
         }
     }
-
     // Close the directory
-    closedir(dir);
+    if (closedir(dir) == -1)
+    {
+        perror("Error in: closedir");
+    }
 }
 
 int grade(char path[MAX_STRING_SIZE], char inputFilePath[MAX_STRING_SIZE], char cOutputPath[MAX_STRING_SIZE])
@@ -234,14 +210,14 @@ int grade(char path[MAX_STRING_SIZE], char inputFilePath[MAX_STRING_SIZE], char 
     int output_fd = open(outputPath, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
     if (output_fd == -1)
     {
-        perror("open");
+        perror("Error in: open");
         return -1;
     }
     int input_fd = open(inputFilePath, O_RDONLY);
     if (input_fd == -1)
     {
         // TODO to change the error
-        perror("open input file");
+        perror("Error in: open");
         return EXIT_FAILURE;
     }
     do
@@ -278,6 +254,11 @@ int grade(char path[MAX_STRING_SIZE], char inputFilePath[MAX_STRING_SIZE], char 
         {
             // compare the output
             int compareStatus = textCompare(outputPath, cOutputPath);
+            if (compareStatus == -1)
+            {
+                perror("Error in: comp.out");
+                break;
+            }
             if (compareStatus == 1)
             {
                 // grade is 100 EXCELLENT
@@ -293,11 +274,16 @@ int grade(char path[MAX_STRING_SIZE], char inputFilePath[MAX_STRING_SIZE], char 
                 // grade is 50 BAD
                 returnValue = 50;
             }
-            // TODO to add error message
         }
     } while (0);
-    unlink(outputPath);
-    close(input_fd);
+    if (unlink(outputPath) == -1)
+    {
+        perror("Error in: unlink");
+    }
+    if (close(input_fd) == -1)
+    {
+        perror("Error in: close");
+    }
     return returnValue;
 }
 
@@ -311,7 +297,8 @@ void runOverAllFolders(char studentsFolder[MAX_STRING_SIZE], char inputFilePath[
     dir = opendir(studentsFolder);
     if (dir == NULL)
     {
-        printf("Error opening directory\n");
+        perror("Error in: opendir");
+        // TODO to change the error
         exit(EXIT_FAILURE);
     }
 
@@ -333,7 +320,7 @@ void runOverAllFolders(char studentsFolder[MAX_STRING_SIZE], char inputFilePath[
         // // Get the file info for the entry
         if (stat(path, &file_info) < 0)
         {
-            printf("Error getting file info for %s\n", entry->d_name);
+            perror("Error in: stat");
             continue;
         }
 
@@ -341,43 +328,52 @@ void runOverAllFolders(char studentsFolder[MAX_STRING_SIZE], char inputFilePath[
         if (S_ISDIR(file_info.st_mode))
         {
             int score = grade(path, inputFilePath, cOutputPath);
-            printf("%s -> %d\n", entry->d_name, score);
             addResultToFile(result_fd, score, entry->d_name);
         }
     }
 
     // Close the directory
-    closedir(dir);
+    if (closedir(dir) == -1)
+    {
+        perror("Error in: closedir");
+    }
 }
 
-int main(/*int argc, char *argv[]*/)
+int main(int argc, char *argv[])
 {
-    // if (argc != 2)
-    // {
-    //     printf("Usage: %s <filename>\n", argv[0]);
-    //     return 1;
-    // }
-    char *confFile /*[MAX_STRING_SIZE]*/ = "conf.txt";
+    if (argc != 2)
+    {
+        perror("Not a valid directory");
+        return EXIT_FAILURE;
+    }
+    char confFile[MAX_STRING_SIZE];
 
-    // strcpy(confFile, argv[1]);
+    strcpy(confFile, argv[1]);
 
     int fdConf = open(confFile, O_RDONLY);
     if (fdConf == -1)
     {
         // todo change to perror
-        printf("Error: failed to open file %s\n", confFile);
-        return 1;
+        perror("Not a valid directory\n");
+        return EXIT_FAILURE;
     }
     char buffer[MAX_STRING_SIZE * 4];
     ssize_t nread;
     nread = read(fdConf, buffer, sizeof(buffer));
     if (nread == -1)
     {
-        printf("Error: failed to read from file %s\n", confFile);
-        close(fdConf);
-        return 1;
+        perror("Error in: read");
+        if (close(fdConf) == -1)
+        {
+            perror("Error in: close");
+        }
+        return EXIT_FAILURE;
     }
-    close(fdConf);
+    if (close(fdConf) == -1)
+    {
+        perror("Error in: close");
+        return EXIT_FAILURE;
+    }
     // to add error TODO
     char studentsFolder[MAX_STRING_SIZE];
     char correct_outputFile[MAX_STRING_SIZE];
@@ -395,14 +391,17 @@ int main(/*int argc, char *argv[]*/)
     int result_fd = open("results.csv", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
     if (result_fd == -1)
     {
-        perror("open result file");
+        perror("Error in: open");
         return EXIT_FAILURE;
     }
 
     // run over all of the folders in the students folder
     runOverAllFolders(studentsFolder, inputFile, correct_outputFile, result_fd);
 
-    close(result_fd);
+    if (close(result_fd) == -1)
+    {
+        perror("Error in: close");
+    }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
