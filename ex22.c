@@ -63,7 +63,7 @@ int executeCommand(char *args[], int input_fd, int output_fd, int error_fd, doub
     if (pid == -1)
     {
         perror("Error in: fork");
-        exit(EXIT_FAILURE);
+        return EXECUTION_ERROR;
     }
     else if (pid == 0)
     {
@@ -82,6 +82,7 @@ int executeCommand(char *args[], int input_fd, int output_fd, int error_fd, doub
     int status;
     struct timeval start_time;
     gettimeofday(&start_time, NULL);
+    // TODO to ceack if need error
     wait(&status);
     struct timeval end_time;
     gettimeofday(&end_time, NULL);
@@ -103,8 +104,8 @@ int textCompare(char path1[MAX_STRING_SIZE], char path2[MAX_STRING_SIZE])
     close(error_fd);
     if (unlink("compeionError") == -1)
     {
-        // TODO to change the error
         perror("Error in: Unlink");
+        return EXECUTION_ERROR;
     }
     return status;
 }
@@ -353,8 +354,7 @@ int main(int argc, char *argv[])
     int fdConf = open(confFile, O_RDONLY);
     if (fdConf == -1)
     {
-        // todo change to perror
-        perror("Not a valid directory\n");
+        perror("Not a valid directory");
         return EXIT_FAILURE;
     }
     char buffer[MAX_STRING_SIZE * 4];
@@ -374,7 +374,6 @@ int main(int argc, char *argv[])
         perror("Error in: close");
         return EXIT_FAILURE;
     }
-    // to add error TODO
     char studentsFolder[MAX_STRING_SIZE];
     char correct_outputFile[MAX_STRING_SIZE];
     char inputFile[MAX_STRING_SIZE];
