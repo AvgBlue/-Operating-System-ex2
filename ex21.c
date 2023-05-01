@@ -21,6 +21,11 @@ typedef struct FileReader
     ssize_t nread;
 } FileReader;
 
+void print_error(const char *message)
+{
+    write(STDERR_FILENO, message, strlen(message));
+}
+
 FileReader openFile(const char *path)
 {
     FileReader fr;
@@ -28,7 +33,7 @@ FileReader openFile(const char *path)
     fr.fd = open(path, O_RDONLY);
     if (fr.fd == -1)
     {
-        perror("open");
+        print_error("open");
         exit(EXIT_FAILURE);
     }
     // Get the size of the file
@@ -47,7 +52,7 @@ void readPart(FileReader *fr)
     fr->nread = read(fr->fd, fr->buf, BUFSIZ);
     if (fr->nread < 0)
     {
-        perror("read");
+        print_error("read");
     }
 }
 
