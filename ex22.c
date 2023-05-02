@@ -1,3 +1,4 @@
+// David Berkovits 318844685
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -16,6 +17,9 @@
 #define EXECUTION_TIMED_OUT 1
 #define EXECUTION_ERROR -1
 
+#define COMPILE_FILE_NAME "compile_file3188.out"
+#define COMPILE_FILE_NAME_LEN 20
+
 void print_error(const char *message)
 {
     write(STDERR_FILENO, message, strlen(message));
@@ -30,16 +34,16 @@ void addResultToFile(int result_fd, int grade, const char *name)
         category = ",0,NO_C_FILE\n";
         break;
     case 10:
-        category = ",10,Compilation_Error\n";
+        category = ",10,COMPILATION_ERROR\n";
         break;
     case 20:
         category = ",20,TIMEOUT\n";
         break;
     case 50:
-        category = ",50,Wrong_output\n";
+        category = ",50,WRONG\n";
         break;
     case 75:
-        category = ",75,Similar_output\n";
+        category = ",75,SIMILAR\n";
         break;
     case 100:
         category = ",100,EXCELLENT\n";
@@ -62,6 +66,11 @@ void addResultToFile(int result_fd, int grade, const char *name)
     }
 }
 
+int is_directory(struct dirent *entry)
+{
+    return entry->d_type == DT_DIR;
+}
+
 int executeCommand(char *args[], int input_fd, int output_fd, int error_fd, double *runtime)
 {
     pid_t pid = fork();
@@ -76,8 +85,8 @@ int executeCommand(char *args[], int input_fd, int output_fd, int error_fd, doub
         // Redirect input, output, and error to files
         dup2(input_fd, STDIN_FILENO);
         dup2(output_fd, STDOUT_FILENO);
-        dup2(error_fd, STDERR_FILENO);
-        // Execute the command
+        // dup2(error_fd, STDERR_FILENO);
+        //  Execute the command
         execvp(args[0], args);
         // If execvp returns, it means an error occurred
         print_error("Error in: execvp");
@@ -101,7 +110,7 @@ int textCompare(char path1[MAX_STRING_SIZE], char path2[MAX_STRING_SIZE])
     if (error_fd == -1)
     {
         print_error("Error in: Open");
-        return -1;
+        return EXECUTION_ERROR;
     }
     double time;
     char *args[] = {"./comp.out", path1, path2, NULL};
@@ -110,7 +119,6 @@ int textCompare(char path1[MAX_STRING_SIZE], char path2[MAX_STRING_SIZE])
     if (unlink("compeionError") == -1)
     {
         print_error("Error in: Unlink");
-        return EXECUTION_ERROR;
     }
     return status;
 }
@@ -121,9 +129,9 @@ int compileFile(char path[MAX_STRING_SIZE])
     if (error_fd == -1)
     {
         print_error("Error in: open");
-        return -1;
+        return EXECUTION_ERROR;
     }
-    char *args[] = {"gcc", path, NULL};
+    char *args[] = {"gcc", path, "-o", COMPILE_FILE_NAME, NULL};
     double time;
     int status = executeCommand(args, STDIN_FILENO, STDOUT_FILENO, error_fd, &time);
     close(error_fd);
@@ -142,16 +150,28 @@ int runFile(int input_fd, int output_fd)
     if (error_fd == -1)
     {
         print_error("Error in: open");
-        return -1;
+        return EXECUTION_ERROR;
     }
-    char *args[] = {"./a.out", NULL};
+    char *fileName = COMPILE_FILE_NAME;
+    char runingFileString[COMPILE_FILE_NAME_LEN];
+    strcpy(runingFileString, "./");
+    strcat(runingFileString, fileName);
+
+    char *args[] = {runingFileString, NULL};
     double time;
-    /*int status = */ executeCommand(args, input_fd, output_fd, error_fd, &time);
-    close(error_fd);
+    int status = executeCommand(args, input_fd, output_fd, error_fd, &time);
+    if (close(error_fd) == -1)
+    {
+        print_error("Error in: close");
+    }
     if (unlink("compeionError") == -1)
     {
         // TODO to change the error
         print_error("Error in: unlink");
+    }
+    if (status == -1)
+    {
+        return EXECUTION_ERROR;
     }
     if (time > 5)
     {
@@ -174,7 +194,7 @@ void findCFile(const char *dir_path, char *c_file_path)
     {
         print_error("Error in: opendir");
         // TODO to change the error
-        exit(EXIT_FAILURE);
+        return;
     }
 
     // Loop through each entry in the directory
@@ -188,7 +208,10 @@ void findCFile(const char *dir_path, char *c_file_path)
         {
             continue;
         }
-
+        if (is_directory(entry))
+        {
+            continue;
+        }
         // Get a pointer to the extension in the file name
         extension = entry->d_name + len - 2;
 
@@ -214,17 +237,17 @@ int grade(char path[MAX_STRING_SIZE], char inputFilePath[MAX_STRING_SIZE], char 
     // TODO to set the file name to defined
     char outputPath[MAX_STRING_SIZE] = "output.txt";
     int output_fd = open(outputPath, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-    if (output_fd == -1)
+    if (output_fd == EXECUTION_ERROR)
     {
         print_error("Error in: open");
-        return -1;
+        return EXECUTION_ERROR;
     }
     int input_fd = open(inputFilePath, O_RDONLY);
-    if (input_fd == -1)
+    if (input_fd == EXECUTION_ERROR)
     {
         // TODO to change the error
         print_error("Error in: open");
-        return EXIT_FAILURE;
+        return EXECUTION_ERROR;
     }
     do
     {
@@ -247,8 +270,18 @@ int grade(char path[MAX_STRING_SIZE], char inputFilePath[MAX_STRING_SIZE], char 
         }
         // try to run the c file
         int runStatus = runFile(input_fd, output_fd);
-        close(output_fd);
-        unlink("a.out");
+        if (runStatus == EXECUTION_ERROR)
+        {
+            return EXECUTION_ERROR;
+        }
+        if (close(output_fd) == -1)
+        {
+            print_error("Error in: close");
+        }
+        if (unlink(COMPILE_FILE_NAME) == -1)
+        {
+            print_error("Error in: unlink");
+        }
         if (runStatus == EXECUTION_TIMED_OUT)
         {
             // grade is 20 TIMEOUT
@@ -263,19 +296,19 @@ int grade(char path[MAX_STRING_SIZE], char inputFilePath[MAX_STRING_SIZE], char 
             if (compareStatus == -1)
             {
                 print_error("Error in: comp.out");
-                break;
+                return EXECUTION_ERROR;
             }
             if (compareStatus == 1)
             {
                 // grade is 100 EXCELLENT
                 returnValue = 100;
             }
-            if (compareStatus == 2)
+            if (compareStatus == 3)
             {
                 // grade is 75 SIMILAR
                 returnValue = 75;
             }
-            if (compareStatus == 3)
+            if (compareStatus == 2)
             {
                 // grade is 50 BAD
                 returnValue = 50;
@@ -334,7 +367,10 @@ void runOverAllFolders(char studentsFolder[MAX_STRING_SIZE], char inputFilePath[
         if (S_ISDIR(file_info.st_mode))
         {
             int score = grade(path, inputFilePath, cOutputPath);
-            addResultToFile(result_fd, score, entry->d_name);
+            if (score != EXECUTION_ERROR)
+            {
+                addResultToFile(result_fd, score, entry->d_name);
+            }
         }
     }
 
@@ -350,17 +386,26 @@ int main(int argc, char *argv[])
     if (argc != 2)
     {
         print_error("Not a valid directory");
-        return EXIT_FAILURE;
+        return 0;
     }
     char confFile[MAX_STRING_SIZE];
 
     strcpy(confFile, argv[1]);
 
+    int errors_fd = open("errors.txt", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (errors_fd == -1)
+    {
+        print_error("Error in: open");
+        return 0;
+    }
+    // TOD to add check for
+    dup2(errors_fd, STDERR_FILENO);
+
     int fdConf = open(confFile, O_RDONLY);
     if (fdConf == -1)
     {
         print_error("Not a valid directory");
-        return EXIT_FAILURE;
+        return 0;
     }
     char buffer[MAX_STRING_SIZE * 4];
     ssize_t nread;
@@ -372,12 +417,12 @@ int main(int argc, char *argv[])
         {
             print_error("Error in: close");
         }
-        return EXIT_FAILURE;
+        return 0;
     }
     if (close(fdConf) == -1)
     {
         print_error("Error in: close");
-        return EXIT_FAILURE;
+        return 0;
     }
     char studentsFolder[MAX_STRING_SIZE];
     char correct_outputFile[MAX_STRING_SIZE];
@@ -391,12 +436,11 @@ int main(int argc, char *argv[])
     // third line
     token = strtok(NULL, "\n");
     strcpy(correct_outputFile, token);
-
     int result_fd = open("results.csv", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
     if (result_fd == -1)
     {
         print_error("Error in: open");
-        return EXIT_FAILURE;
+        return 0;
     }
 
     // run over all of the folders in the students folder
@@ -406,6 +450,10 @@ int main(int argc, char *argv[])
     {
         print_error("Error in: close");
     }
+    if (close(errors_fd) == -1)
+    {
+        print_error("Error in: close");
+    }
 
-    return EXIT_SUCCESS;
+    return 0;
 }

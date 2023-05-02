@@ -1,5 +1,4 @@
-
-
+// David Berkovits 318844685
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -167,9 +166,9 @@ int compareFiles(FileReader *fr1, FileReader *fr2)
     }
     if (similar)
     {
-        return 2;
+        return 3;
     }
-    return 3;
+    return 2;
 }
 
 int main(int argc, char *argv[])
