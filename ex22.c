@@ -8,6 +8,7 @@
 #include <dirent.h>
 #include <sys/time.h>
 #include <sys/wait.h>
+#include <errno.h>
 
 #define MAX_STRING_SIZE 150
 #define CALCULATE_ELAPSED_TIME(start_time, end_time) \
@@ -148,7 +149,6 @@ void findCFile(const char *dir_path, char *c_file_path)
         perror("Error in: opendir");
         return;
     }
-    // TODO to error check in readdir
     // Loop through each entry in the directory
     while ((entry = readdir(dir)) != NULL)
     {
@@ -175,6 +175,11 @@ void findCFile(const char *dir_path, char *c_file_path)
             strcat(c_file_path, entry->d_name);
             break;
         }
+    }
+    // Check for errors in readdir
+    if (errno != 0)
+    {
+        perror("Error in readdir");
     }
     // Close the directory
     if (closedir(dir) == -1)
@@ -318,7 +323,7 @@ void runOverAllFolders(char studentsFolder[MAX_STRING_SIZE], char inputFilePath[
             int score = grade(path, inputFilePath, cOutputPath, errors_fd);
             if (score != EXECUTION_ERROR)
             {
-                //everything is ok in the grading
+                // everything is ok in the grading
                 addResultToFile(result_fd, score, entry->d_name);
             }
         }
