@@ -9,7 +9,7 @@
 #include <string.h>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
-
+#define EXECUTION_ERROR_COMP 4
 typedef struct FileReader
 {
     // file descriptor
@@ -20,7 +20,7 @@ typedef struct FileReader
     ssize_t nread;
 } FileReader;
 
-void print_error(const char *message)
+void perror(const char *message)
 {
     write(STDERR_FILENO, message, strlen(message));
 }
@@ -32,8 +32,7 @@ FileReader openFile(const char *path)
     fr.fd = open(path, O_RDONLY);
     if (fr.fd == -1)
     {
-        print_error("open");
-        exit(EXIT_FAILURE);
+        perror("open");
     }
     // Get the size of the file
     fr.nread = 0;
@@ -51,7 +50,7 @@ void readPart(FileReader *fr)
     fr->nread = read(fr->fd, fr->buf, BUFSIZ);
     if (fr->nread < 0)
     {
-        print_error("read");
+        perror("read");
     }
 }
 
@@ -177,10 +176,14 @@ int main(int argc, char *argv[])
     if (argc != 3)
     {
         printf("Usage: %s <file1> <file2>\n", argv[0]);
-        exit(EXIT_FAILURE);
+        return EXECUTION_ERROR_COMP;
     }
     FileReader fr1 = openFile(argv[1]);
     FileReader fr2 = openFile(argv[2]);
+    if (fr1.fd == -1 || fr2.fd == -1)
+    {
+        return EXECUTION_ERROR_COMP;
+    }
     int value = compareFiles(&fr1, &fr2);
     closeFile(&fr1);
     closeFile(&fr2);
