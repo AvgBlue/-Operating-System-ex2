@@ -336,6 +336,23 @@ void runOverAllFolders(char studentsFolder[MAX_STRING_SIZE], char inputFilePath[
     }
 }
 
+int lineCountInFile(char buffer[MAX_STRING_SIZE * 4])
+{
+    int count = 0;
+    for (int i = 0; i < MAX_STRING_SIZE * 4; i++)
+    {
+        count += buffer[i] == '\n';
+    }
+    return count;
+}
+
+void p()
+{
+    static int i = 0;
+    printf("%d\n", i++);
+    fflush(stdout);
+}
+
 int main(int argc, char *argv[])
 {
     if (argc != 2)
@@ -346,13 +363,6 @@ int main(int argc, char *argv[])
     char confFile[MAX_STRING_SIZE];
 
     strcpy(confFile, argv[1]);
-
-    int errors_fd = open("errors.txt", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-    if (errors_fd == -1)
-    {
-        perror("Error in: open");
-        return 0;
-    }
 
     int fdConf = open(confFile, O_RDONLY);
     if (fdConf == -1)
@@ -389,24 +399,39 @@ int main(int argc, char *argv[])
     // third line
     token = strtok(NULL, "\n");
     strcpy(correct_outputFile, token);
+    if (access(correct_outputFile, F_OK) == -1 || access(inputFile, F_OK) == -1 || access(studentsFolder, F_OK) == -1)
+    {
+        // one of the path didn't exist
+        perror("Error in: access");
+        goto resultAndErrorDidntOpenYet;
+    }
+
     int result_fd = open("results.csv", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
     if (result_fd == -1)
     {
         perror("Error in: open");
+        goto resultIsOpen;
+    }
+    int errors_fd = open("errors.txt", O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (errors_fd == -1)
+    {
+        perror("Error in: open");
+        goto errorIsOpen;
         return 0;
     }
-
     // run over all of the folders in the students folder
     runOverAllFolders(studentsFolder, inputFile, correct_outputFile, result_fd, errors_fd);
 
-    if (close(result_fd) == -1)
-    {
-        perror("Error in: close");
-    }
+errorIsOpen:
     if (close(errors_fd) == -1)
     {
         perror("Error in: close");
     }
-
+resultIsOpen:
+    if (close(result_fd) == -1)
+    {
+        perror("Error in: close");
+    }
+resultAndErrorDidntOpenYet:
     return 0;
 }
