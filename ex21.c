@@ -10,7 +10,7 @@
 #include <string.h>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define EXECUTION_ERROR_COMP 4
+#define EXECUTION_ERROR_COMP -1
 typedef struct FileReader
 {
     // file descriptor

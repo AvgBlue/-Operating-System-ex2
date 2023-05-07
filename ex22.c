@@ -17,7 +17,7 @@
 #define EXECUTION_SUCCESSFUL 0
 #define EXECUTION_TIMED_OUT 1
 #define EXECUTION_ERROR -1
-#define EXECUTION_ERROR_COMP 4
+#define EXECUTION_ERROR_COMP 255
 
 #define COMPILE_FILE_NAME "compile_file3188.out"
 #define COMPILE_FILE_NAME_LEN 20
@@ -76,9 +76,21 @@ int executeCommand(char *args[], int input_fd, int output_fd, int errors_fd, dou
     {
         // Child process
         // Redirect input, output, and error to files
-        dup2(input_fd, STDIN_FILENO);
-        dup2(output_fd, STDOUT_FILENO);
-        dup2(errors_fd, STDERR_FILENO);
+        if (dup2(input_fd, STDIN_FILENO) == -1)
+        {
+            perror("Error in: dup2");
+            exit(EXIT_FAILURE);
+        }
+        if (dup2(output_fd, STDOUT_FILENO) == -1)
+        {
+            perror("Error in: dup2");
+            exit(EXIT_FAILURE);
+        }
+        if (dup2(errors_fd, STDERR_FILENO) == -1)
+        {
+            perror("Error in: dup2");
+            exit(EXIT_FAILURE);
+        }
         //  Execute the command
         execvp(args[0], args);
         // If execvp returns, it means an error occurred
@@ -89,8 +101,11 @@ int executeCommand(char *args[], int input_fd, int output_fd, int errors_fd, dou
     int status;
     struct timeval start_time;
     gettimeofday(&start_time, NULL);
-    // TODO to ceack if need error
-    wait(&status);
+    if (wait(&status) == -1)
+    {
+        perror("Error in: wait");
+        return EXECUTION_ERROR;
+    }
     struct timeval end_time;
     gettimeofday(&end_time, NULL);
     *runtime = CALCULATE_ELAPSED_TIME(start_time, end_time);
@@ -346,13 +361,6 @@ int lineCountInFile(char buffer[MAX_STRING_SIZE * 4])
     return count;
 }
 
-void p()
-{
-    static int i = 0;
-    printf("%d\n", i++);
-    fflush(stdout);
-}
-
 int main(int argc, char *argv[])
 {
     if (argc != 2)
@@ -368,7 +376,7 @@ int main(int argc, char *argv[])
     if (fdConf == -1)
     {
         perror("Not a valid directory");
-        return 0;
+        return EXECUTION_ERROR;
     }
     char buffer[MAX_STRING_SIZE * 4];
     ssize_t nread;
