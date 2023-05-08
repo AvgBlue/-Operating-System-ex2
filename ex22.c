@@ -366,7 +366,7 @@ int main(int argc, char *argv[])
     if (argc != 2)
     {
         perror("Not a valid directory");
-        return 0;
+        return EXECUTION_ERROR;
     }
     char confFile[MAX_STRING_SIZE];
 
@@ -388,12 +388,12 @@ int main(int argc, char *argv[])
         {
             perror("Error in: close");
         }
-        return 0;
+        return EXECUTION_ERROR;
     }
     if (close(fdConf) == -1)
     {
         perror("Error in: close");
-        return 0;
+        return EXECUTION_ERROR;
     }
     char studentsFolder[MAX_STRING_SIZE];
     char correct_outputFile[MAX_STRING_SIZE];
@@ -425,7 +425,6 @@ int main(int argc, char *argv[])
     {
         perror("Error in: open");
         goto errorIsOpen;
-        return 0;
     }
     // run over all of the folders in the students folder
     runOverAllFolders(studentsFolder, inputFile, correct_outputFile, result_fd, errors_fd);
