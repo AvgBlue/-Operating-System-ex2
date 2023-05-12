@@ -7,7 +7,7 @@
 #include <stdlib.h>
 int main()
 {
-    for (int i = 1; i <= 8; i++)
+    for (int i = 1; i <= 12; i++)
     {
         sleep(1);
         printf("%d\n",i);

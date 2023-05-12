@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <signal.h>
 
 #define MAX_STRING_SIZE 150
 #define CALCULATE_ELAPSED_TIME(start_time, end_time) \
@@ -18,6 +19,7 @@
 #define EXECUTION_TIMED_OUT 1
 #define EXECUTION_ERROR -1
 #define EXECUTION_ERROR_COMP 255
+#define RUN_TIME_FOR_TIMEOUT 5
 
 #define COMPILE_FILE_NAME "compile_file3188.out"
 #define COMPILE_FILE_NAME_LEN 20
@@ -64,7 +66,7 @@ void addResultToFile(int result_fd, int grade, const char *name)
     }
 }
 
-int executeCommand(char *args[], int input_fd, int output_fd, int errors_fd, double *runtime)
+int executeCommand(char *args[], int input_fd, int output_fd, int errors_fd, double *runtime,int timeout_flag)
 {
     pid_t pid = fork();
     if (pid == -1)
@@ -91,6 +93,11 @@ int executeCommand(char *args[], int input_fd, int output_fd, int errors_fd, dou
             perror("Error in: dup2");
             exit(EXIT_FAILURE);
         }
+        // Set an alarm to terminate the child process after 10 seconds
+        signal(SIGALRM, exit);
+        if(timeout_flag!=0){
+            alarm(RUN_TIME_FOR_TIMEOUT*2);
+        }
         //  Execute the command
         execvp(args[0], args);
         // If execvp returns, it means an error occurred
@@ -106,6 +113,10 @@ int executeCommand(char *args[], int input_fd, int output_fd, int errors_fd, dou
         perror("Error in: wait");
         return EXECUTION_ERROR;
     }
+    // Cancel the alarm if the child process has terminated before the alarm went off
+    if(timeout_flag!=0){
+        alarm(0);
+    }
     struct timeval end_time;
     gettimeofday(&end_time, NULL);
     *runtime = CALCULATE_ELAPSED_TIME(start_time, end_time);
@@ -116,7 +127,7 @@ int textCompare(char path1[MAX_STRING_SIZE], char path2[MAX_STRING_SIZE], int er
 {
     double time;
     char *args[] = {"./comp.out", path1, path2, NULL};
-    int status = executeCommand(args, STDIN_FILENO, STDOUT_FILENO, errors_fd, &time);
+    int status = executeCommand(args, STDIN_FILENO, STDOUT_FILENO, errors_fd, &time,0);
     return status;
 }
 
@@ -124,7 +135,7 @@ int compileFile(char path[MAX_STRING_SIZE], int errors_fd)
 {
     char *args[] = {"gcc", path, "-o", COMPILE_FILE_NAME, NULL};
     double time;
-    int status = executeCommand(args, STDIN_FILENO, STDOUT_FILENO, errors_fd, &time);
+    int status = executeCommand(args, STDIN_FILENO, STDOUT_FILENO, errors_fd, &time,0);
     // 0 is good 1 is bad
     return status;
 }
@@ -138,14 +149,14 @@ int runFile(int input_fd, int output_fd, int errors_fd)
 
     char *args[] = {runingFileString, NULL};
     double time;
-    int status = executeCommand(args, input_fd, output_fd, errors_fd, &time);
+    int status = executeCommand(args, input_fd, output_fd, errors_fd, &time,1);
+    if (time > RUN_TIME_FOR_TIMEOUT)
+    {
+        return EXECUTION_TIMED_OUT;
+    }
     if (status == -1)
     {
         return EXECUTION_ERROR;
-    }
-    if (time > 5)
-    {
-        return EXECUTION_TIMED_OUT;
     }
     return EXECUTION_SUCCESSFUL;
 }
