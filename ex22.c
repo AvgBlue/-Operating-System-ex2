@@ -1,4 +1,4 @@
-// David Berkovits 318844685
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/stat.h>
