@@ -1,4 +1,3 @@
-// David Berkovits 318844685
 
 #include <stdio.h>
 #include <stdlib.h>
